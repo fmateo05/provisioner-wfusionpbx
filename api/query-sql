@@ -1,0 +1,1 @@
+'INSERT INTO public.v_domains (domain_uuid, domain_parent_uuid, domain_name, domain_enabled, domain_description) VALUES('5f2430f4-e992-1e64-e7fc-be25e67d89a4',null ,'f7b81c.sip.2600hz.com', true, 'phone system prov test 008');'

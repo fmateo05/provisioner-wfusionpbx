@@ -1,0 +1,25 @@
+{
+    "version": "5.3.2",
+    "static_data_source": "database",
+    "adapter": "2600hz",
+    "db_prefix": "",
+
+    "paths": {
+        "endpoint": "/endpoint/",
+        "firmwares": "http://my.domain.com/firmware/"
+    },
+    
+    "database": {
+        "type": "bigcouch",
+        "url": "http://3.3.3.3",
+        "port": 15984,
+        "username": "",
+        "password": "",
+
+        "master_provider": {
+            "name": "Master provider",
+            "ip": "10.10.10.11",
+            "domain": "prov.example.com"
+        }
+    }
+}

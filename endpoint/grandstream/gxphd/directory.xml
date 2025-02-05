@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AddressBook>
+    {% set x = 1 %}
+    {% for contact in directory %}
+    <Contact>
+        <id>{{ x }}</id>
+        <LastName>{{ contact.name }}</LastName>
+        <!--FirstName>Enter first name here</FirstName-->
+        <Phone type="Work">
+            <phonenumber>{{ contact.internal_number }}</phonenumber>
+            <accountindex>1</accountindex>
+        </Phone>
+        <Groups>
+            <groupid>0</groupid>
+        </Groups>
+        {% set x = x + 1 %}
+    </Contact>
+  {% endfor %}
+</AddressBook>
+
