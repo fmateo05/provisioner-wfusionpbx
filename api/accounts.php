@@ -9,6 +9,35 @@
  * @package Provisioner
  * @version 5.0
  */
+/*
+class connectionParams {}
+$param = new connectionParams;
+// 'host' for the PostgreSQL server
+$param->host = "127.0.0.1";
+
+// default port for PostgreSQL is "5432"
+$param->port = 5432;
+
+// set the database name for the connection
+$param->dbname = "fusionpbx";
+
+// set the username for PostgreSQL database
+$param->user = "fusionpbx";
+
+// password for the PostgreSQL database
+$param->password = "ajvaDBoVRyhvlvuTUFDFZkcWR8";
+
+$hostString = "";
+
+foreach ($param as $key => $value) {
+
+// concatenate the connect params with each iteration
+$hostString = $hostString . $key . "=" . $value . " ";
+}
+
+$conn = pg_connect($hostString);
+
+*/
 class Accounts {
 
     public $db;
@@ -92,10 +121,11 @@ class Accounts {
 
     function editDocument($account_id, $mac_address = null, $request_data = null) {
 $host= '127.0.0.1';
-$database = 'fusionpbx';
+$database = 'fusionpbx-prov';
 $user = 'fusionpbx';
-$password = ''; // change to your password
+$password = 'ajvaDBoVRyhvlvuTUFDFZkcWR8'; // change to your password
 $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database  ;
+$dbconn = pg_connect("host=$host dbname=$database user=$user password=$password") or die('Could not connect: ' . pg_last_error());
 	$input = $account_id ;
 	$account_uuid = preg_replace("/(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})/i", "$1-$2-$3-$4-$5", $input);
         $account_db = $this->_get_account_db($account_id);
@@ -122,9 +152,66 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
                 $request_data['family'] = $request_data['settings']['provision']['endpoint_family'];
                 $request_data['model'] = $request_data['settings']['provision']['endpoint_model'];
 // 		$sql = "UPDATE public.v_devices (device_uuid, domain_uuid, device_address, device_vendor, device_model, device_template) VALUES(" . "'" . $device_id . "','" . $account_uuid . "','" . $mac_address  . "','" . $request_data['settings']['provision']['endpoint_brand'] . "','" . $request_data['settings']['provision']['endpoint_model'] . "', true ,'" . $request_data['settings']['provision']['endpoint_brand'] . "/" . $request_data['settings']['provision']['endpoint_model'] . " WHERE device_uuid=".  $device_id ."');";
-		$sql = "UPDATE public.v_devices SET domain_uuid='".$account_uuid."', device_profile_uuid=?, device_address='".$mac_address."', device_label='".$request_data['name']."', device_vendor='". $request_data['settings']['provision']['endpoint_brand'] ."', device_model='".$request_data['settings']['provision']['endpoint_model']."', device_enabled=true, device_template='".$request_data['settings']['provision']['endpoint_brand'] . "/" . $request_data['settings']['provision']['endpoint_model']  ."', device_username='".$request_data['settings']['sip']['username']."', device_password='".$request_data['settings']['sip']['password']."'  WHERE device_uuid='".$device_id."';";
+		$sql = "UPDATE public.v_devices SET domain_uuid='".$account_uuid."', device_address='".$mac_address."', device_label='".$request_data['name']."', device_vendor='". $request_data['settings']['provision']['endpoint_brand'] ."', device_model='".$request_data['settings']['provision']['endpoint_model']."', device_enabled=true, device_template='".$request_data['settings']['provision']['endpoint_brand'] . "/" . $request_data['settings']['provision']['endpoint_model']  ."', device_username='".$request_data['settings']['sip']['username']."', device_password='".$request_data['settings']['sip']['password']."'  WHERE device_uuid='".$device_id."';";
 		$sql_data = "UPDATE public.v_domains SET  domain_name=(SELECT domain_name FROM public.v_domains WHERE domain_uuid='" . $account_uuid ."'), domain_description='". $request_data['name'] ."'  WHERE domain_uuid='" . $account_uuid . "';";
 		$sql_lines = "UPDATE public.v_device_lines SET domain_uuid='". $account_uuid . "', device_uuid='".$device_id."', line_number='1', server_address=(SELECT domain_name FROM public.v_domains WHERE domain_uuid='".$account_uuid ."'), label='". $request_data['settings']['sip']['username'] ."', display_name='".$request_data['name']."', user_id='". $request_data['settings']['sip']['username']."', auth_id='". $request_data['settings']['sip']['username']."', password='". $request_data['settings']['sip']['password']."', sip_port='7000', sip_transport='udp', register_expires=120, shared_line='', enabled=true WHERE device_line_uuid=(SELECT device_line_uuid FROM public.v_device_lines WHERE device_uuid='". $device_id ."' AND domain_uuid='".$account_uuid."');";
+		
+//		$j = ($i +1);
+		$newuuid_ck = trim(file_get_contents('/proc/sys/kernel/random/uuid'));
+		$newuuid_fk = trim(file_get_contents('/proc/sys/kernel/random/uuid'));
+		//$init_category = array_keys($request_data['settings']['provision']);
+		//$category = array_values($init_category); 
+//		$cat = array("'". $category['0'] . "'" => 'memory', "'" . $category['4'] . "'" => 'line');
+//		$fk = $cat['feature_keys'];
+//		$ck = $cat['combo_keys'];
+		
+		$alllinesck = array_values(array_keys($request_data['settings']['provision']['combo_keys'])) ;
+		$alllinesfk = array_values(array_keys($request_data['settings']['provision']['feature_keys'])) ;
+                $count_ck = count($request_data['settings']['provision']['combo_keys']);
+                for ($i = 0 ; $i < count($alllinesck) ; $i++){ 
+                $count = count($request_data['settings']['provision']['combo_keys']);
+                $device_key_type =  str_replace('_',' ',$request_data['settings']['provision']['combo_keys'][$alllinesck[$i]]['type']);
+                $device_key_value = trim($request_data['settings']['provision']['combo_keys'][$alllinesck[$i]]['value']['value']);
+                $device_key_label = trim($request_data['settings']['provision']['combo_keys'][$alllinesck[$i]]['value']['label']);
+                $device_key_line = '0';
+                $device_key_id= $alllinesck[$i] ;
+		
+		$sql_lines_placeholder_ck[$i] = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_line, device_key_value, device_key_label) VALUES('".trim($account_uuid)."','".trim(file_get_contents('/proc/sys/kernel/random/uuid'))."',(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'),'".$device_key_id."','line','".$request_data['settings']['provision']['endpoint_brand']."','".$device_key_type."','".$device_key_line."','".$device_key_value."','".$device_key_label."');";
+		$sql_lines_ck[$i] = "UPDATE public.v_device_keys SET domain_uuid='".$account_uuid."', device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), device_key_id='".$device_key_id."', device_key_category='line', device_key_vendor='".$request_data['settings']['provision']['endpoint_brand']."', device_key_type='".$device_key_type."' , device_key_line='".$device_key_line."', device_key_value='".$device_key_value."', device_key_label='".$device_key_label."' WHERE device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='". $request_data['settings']['mac_address']."') AND device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."') ;";
+//		$sql_lines_ck[$i] = "UPDATE public.v_device_keys SET domain_uuid='".$account_uuid."', device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='=".$request_data['settings']['mac_address']."'), device_key_id='".$device_key_id."', device_key_category='line', device_key_vendor='".$request_data['settings']['provision']['endpoint_brand']."', device_key_type='".$device_key_type."' , device_key_line='".$device_key_line."', device_key_value='".$device_key_value."', device_key_label='".$device_key_label."' WHERE device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='". $request_data['settings']['mac_address']."') AND device_uuid='". $device_id ."';";
+//                file_put_contents('/var/www/html/request-arrays',$device_key_type,FILE_APPEND);
+//                file_put_contents('/var/www/html/request-arrays',$device_key_value,FILE_APPEND);
+		}
+                for ($j = 0 ; $j < count($alllinesfk) ; $j++){ 
+                $count_fk = count($request_data['settings']['provision']['feature_keys']);
+                $device_key_type_fk =  str_replace('_',' ',$request_data['settings']['provision']['feature_keys'][$alllinesfk[$j]]['type']);
+                $device_key_value_fk = trim($request_data['settings']['provision']['feature_keys'][$alllinesfk[$j]]['value']);
+//                $device_key_label = trim($request_data['settings']['provision']['feature_keys'][$alllinesfk[$i]]['value']['label']);
+                $device_key_line_fk = '0';
+                $device_key_id_fk= $alllinesfk[$j] ;
+		$sql_lines_placeholder_fk[$j] = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_line, device_key_value) VALUES('".$account_uuid."', '".trim(file_get_contents('/proc/sys/kernel/random/uuid'))."', (SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'),'".($device_key_id_fk + 1)."' , 'memory', '".$request_data['settings']['provision']['endpoint_brand']."', '".$device_key_type_fk."', '".$device_key_line_fk."', '".$device_key_value_fk."');";
+		$sql_lines_fk[$j] = "UPDATE public.v_device_keys SET domain_uuid='".$account_uuid."', device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), device_key_id='".$device_key_id_fk."', device_key_category='memory', device_key_vendor='".$request_data['settings']['provision']['endpoint_brand']."', device_key_type='".$device_key_type_fk."' , device_key_line='".$device_key_line_fk."', device_key_value='".$device_key_value_fk."' WHERE device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='". $request_data['settings']['mac_address']."') AND device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."') ;";
+		}
+                file_put_contents('/var/www/html/request-arrays',print_r($device_key_type), FILE_APPEND);
+                file_put_contents('/var/www/html/request-arrays',print_r($device_key_value), FILE_APPEND);
+               
+//		$sql_check_fk = "SELECT device_key_uuid from public.v_device_keys WHERE device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."')";
+//	file_put_contents("/var/www/html/request-array","'". $linesfk);
+//		$sql_lines_other = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_subtype, device_key_line, device_key_value, device_key_extension, device_key_protected, device_key_label) VALUES('". $account_uuid . "','". $device_id ."','". $device_id."' , ". $array_keys($request_data['settings']['provision']['combo_keys'][$lines])." , '". array_keys($request_data['settings']['provision']["'". 'combo'||'feature' . "'" . '_keys' . "'"]) ."', '". $request_data['settings']['provision']['endpoint_brand'] ."', '". $request_data['settings']['provision']['combo_keys'][$i]['type'] . "', '', ".array_keys($request_data['settings']['provision']['combo_keys'][$lines]) ." , '". $request_data['settings']['provision']['combo_keys'][$i]['value']['value']."', '', '', '". $request_data['settings']['provision']['combo_keys'][$i]['value']['label'] ."');";
+		for($i = 0 ; $i < $count_ck ;  $i++){
+
+		 $cmd = "psql -d " . '"' .$conn. '" -c ' . '"' . $sql_lines_placeholder_ck[$i] . '"'  ;
+		 shell_exec($cmd);
+
+
+		}
+		for($j = 0 ; $j < $count_fk ;  $j++){
+		 $cmd = "psql -d " . '"' .$conn. '" -c ' . '"' . $sql_lines_placeholder_fk[$j] . '"'  ;
+		 shell_exec($cmd);
+
+
+		}
+               
             }
         }
         
@@ -140,13 +227,47 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
             if (!$this->db->isDocExist('mac_lookup', $mac_address)) {
                 $obj = array('_id' => $mac_address, 'account_id' => $account_id);
                 if ($this->db->add('mac_lookup', $obj))
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
+//		foreach ($request_data['settings']['provision']['combo_keys'] as $lines => $value ) {
+		
+//		for ($lines = 0 ; $lines <= count($request_data['settings']['provision']['combo_keys']); $lines++){
+//           	$check_ck = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_check_ck . '"'  );
+//                $sql_check_ck = "SELECT device_key_uuid from public.v_device_keys WHERE device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."')";
+//		$check_ck = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_check_ck . '"'  );
+//		$sql_lines_placeholder_ck = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_subtype, device_key_line, device_key_value, device_key_extension,  device_key_label) VALUES('".$account_uuid."', '".$newuuid_ck."', (SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), 0, '', '', '', '', 0, '', '', '');";
+//		
+//		$sql_lines_ck = "UPDATE public.v_device_keys SET domain_uuid='".$account_uuid."', device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), device_key_id='".$linesck ."', device_key_category='line', device_key_vendor='".$request_data['settings']['provision']['endpoint_brand']."', device_key_type='".$device_key_type."', device_key_line='". $device_key_line ."', device_key_value='". $device_key_value ."', device_key_label='".$device_key_label."' WHERE device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='". $request_data['settings']['mac_address']."');"; // AND device_key_uuid='". $newuuid_ck ."';";
+////	file_put_contents("/var/www/html/request-array","'". $linesfk);
+//		$sql_lines_placeholder_fk = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_subtype, device_key_line, device_key_value, device_key_extension,  device_key_label) VALUES('".$account_uuid."', '".$newuuid_fk."', (SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), 0, '', '', '', '', 0, '', '', '');";
+//		$sql_lines_fk = "UPDATE public.v_device_keys SET domain_uuid='".$account_uuid."', device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."'), device_key_id='". $linesfk."', device_key_category='memory', device_key_vendor='".$request_data['settings']['provision']['endpoint_brand']."', device_key_type='".$device_key_type."', device_key_line='".$device_key_line."', device_key_value='".$request_data['settings']['provision']['feature_keys'][$linesfk]['value']['value']."', device_key_label='".$request_data['settings']['provision']['feature_keys'][$linesfk]['value']['label']."' WHERE device_uuid=(SELECT device_uuid from public.v_devices WHERE device_address='". $request_data['settings']['mac_address']."');"; // AND device_key_uuid='".$newuuid_fk."';";
+////		$sql_lines_other = "INSERT INTO public.v_device_keys (domain_uuid, device_key_uuid, device_uuid, device_key_id, device_key_category, device_key_vendor, device_key_type, device_key_subtype, device_key_line, device_key_value, device_key_extension, device_key_protected, device_key_label) VALUES('". $account_uuid . "','". $device_id ."','". $device_id."' , ". $array_keys($request_data['settings']['provision']['combo_keys'][$lines])." , '". array_keys($request_data['settings']['provision']["'". 'combo'||'feature' . "'" . '_keys' . "'"]) ."', '". $request_data['settings']['provision']['endpoint_brand'] ."', '". $request_data['settings']['provision']['combo_keys'][$i]['type'] . "', '', ".array_keys($request_data['settings']['provision']['combo_keys'][$lines]) ." , '". $request_data['settings']['provision']['combo_keys'][$i]['value']['value']."', '', '', '". $request_data['settings']['provision']['combo_keys'][$i]['value']['label'] ."');";
+//               
+
+		
+	for  ($i = 0 ; $i < count($request_data['settings']['provision']['combo_keys']);  $i++){
+                
+//		if(!$check_ck){
+		 $cmd = "psql -d " . '"' .$conn. '" -c ' . "'". $sql_lines_placeholder_ck[$i] . "'"  ;
+		 shell_exec($cmd);
+//	        pg_query(pg_escape_string($sql_lines_placeholder_ck)) or die('Error message: ' . pg_last_error());
+//		} else {
+  //                  shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+//		}
+
+		}
+		/*
+	for  ($i = 0 ; $i < $count_fk ; $j++){
+                  shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_fk[$j] . '"'  );
+	
+	}
+		 */
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
 		    
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql,true) . "'",FILE_APPEND );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_data,true) . "'",FILE_APPEND );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines,true) . "'",FILE_APPEND );
+	file_put_contents("/var/www/html/request-data","'". print_r($request_data,true) . "'" );
+	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_ck,true) . "'",FILE_APPEND );
+	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_placeholder_ck,true) . "'",FILE_APPEND );
+	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_fk,true) . "'",FILE_APPEND );
                     return array('status' => true, 'message' => 'Document successfully added');
             } else {
                 if (!$this->db->update('mac_lookup', $mac_address, 'account_id', $account_id)) {
@@ -156,21 +277,83 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
             }
             $this->_log->logDebug("done... Edit for account $account_id and mac_address $mac_address SUCCESS");
 
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql,true) . "'" );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_data,true) . "'",FILE_APPEND );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines,true) . "'",FILE_APPEND );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
+///		for ($i = 0 ; $i < count($request_data['settings']['provision']['combo_keys']); $i++){
+                
+
+//		if(!$check_ck){
+//	        pg_query(pg_escape_string($sql_lines_placeholder_ck)) or die('Error message: ' . pg_last_error());
+//	        pg_query(pg_escape_string($sql_lines_ck)) or die('Error message: ' . pg_last_error());
+//	        shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_ck[$i] . '"'  );
+//	        shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_fk[$i] . '"'  );
+//	        shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+//		} else {
+//                shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+//		}
+///		}
+/*		while ($i <= count($request_data['settings']['provision']['combo_keys'])){
+                
+		
+
+//		if(!$check_ck){
+		 shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_ck[$i] . '"'  );
+                 shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+//		} else {
+//                   shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck . '"'  );
+		
+//                    }
+                $i++;
+		}
+ */
+	file_put_contents("/var/www/html/request-data","'". print_r($request_data,true) . "'" );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql . '\n',true) . "'" );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_data . '\n' ,true) . "'",FILE_APPEND );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines. '\n' ,true) . "'",FILE_APPEND );
+	file_put_contents("/var/www/html/request-data-sql",print_r($sql_lines_placeholder_ck,true),FILE_APPEND );
+	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_ck,true) ,FILE_APPEND );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_fk . '\n' ,true) . "'",FILE_APPEND );
             return array('status' => true, 'message' => 'Document successfully added');
 
-        } else
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
-		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql,true) . "'");
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_data,true) . "'",FILE_APPEND );
-	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines,true) . "'",FILE_APPEND );
+        } else {
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_data . '"'  );
+		shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines . '"'  );
+//		$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder . '"'  );
+		/*
+	for  ($i = 0 ; $i < count($request_data['settings']['provision']['combo_keys']);  $i++){
+//		if(!$check_ck) {
+		  $queryexec = shell_exec("query.sh ". $conn . '  '  . $sql_lines_placeholder_ck[$i] );
+		 file_put_contents("/var/www/html/request-data-bash","'". $queryexec);
+//		  shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+		 
+//		} else {
+//                shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+//		}
+		}
+*/
+	}
+	/*
+		while ($i <= $count){
+		$query_ins = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_fk . '"'  );
+                $sql_check_ck = "SELECT device_key_uuid from public.v_device_keys WHERE device_uuid=(SELECT device_uuid FROM public.v_devices WHERE device_address='".$request_data['settings']['mac_address']."')";
+		
+		if(!$check_ck) {
+		  $query_ins = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_placeholder_ck[$i] . '"'  );
+                    $query_upd =shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+		} else {
+                    $query_upd =shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_lines_ck[$i] . '"'  );
+		}
+		$i++;
+		}
+	*/
+//	file_put_contents("/var/www/html/request-data","'". print_r($request_data,true) . "'" );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql,true) . "'");
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_data,true) . "'",FILE_APPEND );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines,true) . "'",FILE_APPEND );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_placeholder . '\n',true) . "'",FILE_APPEND );
+//	file_put_contents("/var/www/html/request-data-sql","'". print_r($sql_lines_other. '\n',true) . "'",FILE_APPEND );
             return array('status' => true, 'message' => 'Document successfully added');
     }
 
@@ -186,10 +369,12 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
 
     function addDocument($account_id, $mac_address = null, $request_data = null) {
 $host= '127.0.0.1';
-$database = 'fusionpbx';
+$database = 'fusionpbx-prov';
 $user = 'fusionpbx';
-$password = ''; // change to your password
+$password = 'ajvaDBoVRyhvlvuTUFDFZkcWR8'; // change to your password
 $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database  ;
+$dbconn = pg_connect("host=$host dbname=$database user=$user password=$password")
+        or die('Could not connect: ' . pg_last_error());
         $this->_log->logDebug(" - PUT - Adding account first...");
         $this->_log->logDebug("Request coming from " . $_SERVER['REMOTE_ADDR']);
 
@@ -210,7 +395,7 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
         }
 
         $object_ready = $this->db->prepareAddAccounts($request_data, $account_db, $account_id, $mac_address);
-	file_put_contents("/var/www/html/request-data","'". print_r($object_ready,true) . "'" );
+//	file_put_contents("/var/www/html/request-data","'". print_r($object_ready,true) . "'" );
 //	$input = trim(file_get_contents('/proc/sys/kernel/random/uuid'));
 	$input = $account_id ;
 	$input_id = $request_data['id'];
@@ -222,14 +407,14 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
 	$sql_line_domain= "UPDATE public.v_device_lines set server_address = (SELECT domain_name FROM public.v_domains WHERE domain_uuid='" . $account_uuid ."' ) WHERE domain_uuid='". $account_uuid  ."' AND device_uuid='". $device_id  ."';";
 //	$sql = "INSERT INTO public.v_domains (domain_uuid, domain_parent_uuid, domain_name, domain_enabled, domain_description) VALUES('5f2430f4-e992-1e64-e7fc-be25e67d89a4',null ,'f7b81c.sip.2600hz.com', true, 'phone system prov test 008');";
 
-	$query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
+	shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql . '"'  );
 	file_put_contents("/var/www/html/query-sql","'". $sql . "'" );
         if(!$this->db->add($account_db, $object_ready)) {
             $this->_log->logDebug("Fail to add the account... EXIT");
             throw new RestException(500, 'Error while saving');
         } else {
 	file_put_contents("/var/www/html/query-sql","'". $sql . "'" );
-		$query;
+		
             if ($mac_address) {
                 $this->_log->logDebug("Adding the device with mac_address $mac_address...");
                 if (!$this->db->isDocExist('mac_lookup', $mac_address)) {
@@ -237,9 +422,9 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
                     $obj = array('_id' => $mac_address, 'account_id' => $account_id);
                     if ($this->db->add('mac_lookup', $obj)) {
 //		$query;
-	$dev_query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_device . '"'  );
-	$line_query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_line  . '"'  );
-	$line_dom_query = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_line_domain  . '"'  );
+	shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_device . '"'  );
+	shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_line  . '"'  );
+	shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_line_domain  . '"'  );
 	file_put_contents("/var/www/html/query-sql","'". $sql_device . "'" );
 	file_put_contents("/var/www/html/query-sql-line","'". $sql_line . "'" );
 	file_put_contents("/var/www/html/query-sql-line-domain","'". $sql_line_domain . "'" );
@@ -251,8 +436,6 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
                 return array('status' => false, 'message' => 'Could not create the mac_lookup document');
 
             } else {
-	file_put_contents("/var/www/html/query-sql","'". $sql . "'" );
-		$query;
                 $this->_log->logDebug("Successfully Add account");
                 return array('status' => true, 'message' => 'Document successfully added');
             }
@@ -270,10 +453,11 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
 
     function delDocument($account_id, $mac_address = null) {
 $host= '127.0.0.1';
-$database = 'fusionpbx';
+$database = 'fusionpbx-prov';
 $user = 'fusionpbx';
-$password = ''; // change to your password
+$password = 'ajvaDBoVRyhvlvuTUFDFZkcWR8'; // change to your password
 $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database  ;
+//$dbconn = pg_connect("host=$host dbname=$database user=$user password=$password")        or die('Could not connect: ' . pg_last_error());
         // making sure that the mac_address is well fornated
         $mac_address = strtolower(preg_replace('/-/', '', $mac_address));
         $account_db = $this->_get_account_db($account_id);
@@ -302,7 +486,7 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
                             throw new RestException(500, 'Could not delete the lookup entry');
                         }
 
-			$query_mac = shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_mac . '"'  );
+		        shell_exec("psql -d " . '"' . $conn . '" -c ' . '"' . $sql_mac . '"'  );
 			file_put_contents("/var/www/html/query-del-sql","'". $sql_mac . "'" );
                         $this->_log->logDebug("Successfully deleted device ($mac_address)");
                         return array('status' => true, 'message' => 'Document successfully deleted');
@@ -338,16 +522,30 @@ $conn = 'postgres://' . $user . ':' . $password . '@' . $host . '/' . $database 
                     return array('status' => true, 'message' => 'Account successfully deleted');
                 } else {
                     $this->_log->logDebug("Failed to delete the account ($account_id) - EXIT");
-		echo	$query;
-			$query;
+		
                     throw new RestException(500, 'Could not delete the account database');
                 }
             }
         } else {
-		$query;
+		/*
+		$querya;
+		$queryb;/
+		$queryc;
+		$queryd;
+		$queryf;
+		$queryg;
+		$queryh;
+		$queryi;
+		$queryj;
+		$queryk;
+		$queryl;
+		$querym;
+		$queryn;
+		 */
             $this->_log->logDebug("The account ($account_id) do not exist");
             throw new RestException(404, 'This account do not exist');
         }
     }
 }
 ?>
+
